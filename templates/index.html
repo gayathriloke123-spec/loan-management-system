@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Loan Management System</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&display=swap"
+          rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+<div class="header">
+    <div class="header-inner">
+        <h1>🏦 Loan Management System</h1>
+        <p>Manage customers, loans and payments easily</p>
+
+        <div class="stats">
+            <div class="stat">
+                <span class="stat-value">{{ stats.count }}</span>
+                <span class="stat-label">Customers</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value">{{ stats.lent|inr }}</span>
+                <span class="stat-label">Principal lent</span>
+            </div>
+            <div class="stat">
+                <span class="stat-value">{{ stats.collected|inr }}</span>
+                <span class="stat-label">Collected</span>
+            </div>
+            <div class="stat stat-key">
+                <span class="stat-value">{{ stats.outstanding|inr }}</span>
+                <span class="stat-label">Still to collect</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flashes" role="status">
+        {% for category, message in messages %}
+        <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <div class="layout">
+
+        <div class="card form-card">
+
+            <h2>Add new customer</h2>
+
+            <form action="/add" method="POST">
+
+                <label for="id">Customer ID</label>
+                <input type="text" id="id" name="id"
+                       placeholder="e.g. C001" required>
+
+                <label for="name">Customer name</label>
+                <input type="text" id="name" name="name"
+                       placeholder="Full name" required>
+
+                <label for="phone">Phone number</label>
+                <input type="tel" id="phone" name="phone"
+                       placeholder="10-digit mobile number" required>
+
+                <label for="loan">Loan amount (₹)</label>
+                <input type="number" id="loan" name="loan"
+                       min="1" placeholder="50000" required>
+
+                <div class="row">
+                    <div>
+                        <label for="interest">Interest (% / year)</label>
+                        <input type="number" id="interest" step="0.01"
+                               min="0" name="interest"
+                               placeholder="12" required>
+                    </div>
+                    <div>
+                        <label for="duration">Duration (months)</label>
+                        <input type="number" id="duration" name="duration"
+                               min="1" placeholder="12" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    Add customer
+                </button>
+
+            </form>
+
+        </div>
+
+        <div class="main-col">
+
+            {% if result %}
+            <div class="card result">
+
+                <div class="result-head">
+                    <h2>EMI for {{ result.name }}</h2>
+                    <a class="close" href="/">Close</a>
+                </div>
+
+                <div class="emi-figure">
+                    <span class="emi-amount">{{ result.emi|inr }}</span>
+                    <span class="emi-note">per month for {{ result.duration }} months</span>
+                </div>
+
+                <dl class="result-grid">
+                    <div><dt>Loan amount</dt><dd>{{ result.loan|inr }}</dd></div>
+                    <div><dt>Interest rate</dt><dd>{{ result.interest }}% a year</dd></div>
+                    <div><dt>Total interest</dt><dd>{{ result.interest_amount|inr }}</dd></div>
+                    <div><dt>Total payable</dt><dd>{{ result.total|inr }}</dd></div>
+                </dl>
+
+            </div>
+            {% endif %}
+
+            <div class="card">
+
+                <h2>Customer details</h2>
+
+                {% if customers %}
+
+                <div class="table-wrap">
+                <table>
+
+                    <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th class="num">Loan</th>
+                        <th class="num">EMI</th>
+                        <th>Payment</th>
+                        <th class="num">Balance</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+
+                    <tbody>
+                    {% for customer in customers %}
+
+                    <tr>
+
+                        <td class="muted">{{ customer.id }}</td>
+
+                        <td>
+                            <strong>{{ customer.name }}</strong>
+                            <span class="sub">{{ customer.phone }}</span>
+                        </td>
+
+                        <td class="num">{{ customer.loan|inr }}</td>
+
+                        <td class="num">
+                            {{ customer.emi|inr }}
+                            <a class="link" href="/emi/{{ customer.id }}">Details</a>
+                        </td>
+
+                        <td>
+                            {% if customer.cleared %}
+                            <span class="badge">Fully paid</span>
+                            {% else %}
+                            <form action="/payment/{{ customer.id }}"
+                                  method="POST" class="pay-form">
+
+                                <input type="number" name="payment"
+                                       min="1" step="0.01"
+                                       max="{{ customer.balance }}"
+                                       placeholder="Amount" required
+                                       aria-label="Payment amount for {{ customer.name }}">
+
+                                <button type="submit" class="btn btn-small">
+                                    Pay
+                                </button>
+
+                            </form>
+                            {% endif %}
+                        </td>
+
+                        <td class="num">
+                            <strong>{{ customer.balance|inr }}</strong>
+                            <div class="bar" title="{{ customer.progress }}% repaid">
+                                <span style="width: {{ customer.progress }}%"></span>
+                            </div>
+                        </td>
+
+                        <td>
+                            <form action="/delete/{{ customer.id }}" method="POST"
+                                  onsubmit="return confirm('Delete {{ customer.name|e }} and their payment history?');">
+                                <button type="submit" class="btn-text danger">Delete</button>
+                            </form>
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+                    </tbody>
+
+                </table>
+                </div>
+
+                {% else %}
+
+                <p class="empty">No customers yet. Add the first one using the form to start tracking loans.</p>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+</body>
+</html>
